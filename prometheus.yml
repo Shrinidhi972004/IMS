@@ -1,0 +1,16 @@
+global:
+  scrape_interval:     10s
+  evaluation_interval: 10s
+  external_labels:
+    monitor: 'ims-monitor'
+
+scrape_configs:
+  - job_name: 'ims-backend'
+    static_configs:
+      - targets: ['backend:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

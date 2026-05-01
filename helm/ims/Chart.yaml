@@ -1,0 +1,13 @@
+apiVersion: v2
+name: ims
+description: Incident Management System — production Helm chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - incident-management
+  - sre
+  - observability
+maintainers:
+  - name: Shrinidhi
+    url: https://github.com/Shrinidhi972004
