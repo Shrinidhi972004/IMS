@@ -21,6 +21,7 @@ type Handler struct {
 	rateLimiter *RateLimiter
 	postgres    *store.PostgresStore
 	redis       *store.RedisStore
+	dispatcher  *alerting.Dispatcher
 }
 
 // NewHandler constructs the ingestion handler with all dependencies.

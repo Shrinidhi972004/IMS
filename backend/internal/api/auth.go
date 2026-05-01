@@ -2,21 +2,72 @@ package api
 
 import (
 	"os"
+	"sync"
 	"time"
 
-	"github.com/gofiber/contrib/jwt"
+	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/shrinidhi972004/ims/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// hardcoded demo users — in production this would be a DB table
-// passwords are bcrypt hashed: admin/admin123, viewer/viewer123
-var demoUsers = map[string]string{
-	"admin":  "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", // admin123
-	"viewer": "$2a$10$Ei7JCFpkHGfHMcIHALkOeOtZT.GGLkPiB4/dInxjSikvzs7jOXqXi", // viewer123
+// ---------------------------------------------------------------------------
+// In-memory user store — signup/login without a DB dependency
+// ---------------------------------------------------------------------------
+
+type user struct {
+	ID           string
+	Username     string
+	PasswordHash string
+	CreatedAt    time.Time
 }
+
+type userStore struct {
+	mu    sync.RWMutex
+	users map[string]*user // keyed by username
+}
+
+var users = &userStore{
+	users: map[string]*user{},
+}
+
+func (s *userStore) create(username, password string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.users[username]; exists {
+		return fiber.NewError(fiber.StatusConflict, "username already taken")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	if err != nil {
+		return err
+	}
+	s.users[username] = &user{
+		ID:           uuid.New().String(),
+		Username:     username,
+		PasswordHash: string(hash),
+		CreatedAt:    time.Now().UTC(),
+	}
+	return nil
+}
+
+func (s *userStore) verify(username, password string) (*user, error) {
+	s.mu.RLock()
+	u, exists := s.users[username]
+	s.mu.RUnlock()
+	if !exists {
+		return nil, models.ErrInvalidCredentials
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
+		return nil, models.ErrInvalidCredentials
+	}
+	return u, nil
+}
+
+// ---------------------------------------------------------------------------
+// JWT helpers
+// ---------------------------------------------------------------------------
 
 func jwtSecret() []byte {
 	s := os.Getenv("JWT_SECRET")
@@ -26,7 +77,17 @@ func jwtSecret() []byte {
 	return []byte(s)
 }
 
-// JWTMiddleware protects routes — returns 401 on missing/invalid token.
+func makeToken(username string) (string, error) {
+	claims := jwt.MapClaims{
+		"sub": username,
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret())
+}
+
+// JWTMiddleware protects routes.
 func JWTMiddleware() fiber.Handler {
 	return jwtware.New(jwtware.Config{
 		SigningKey: jwtware.SigningKey{Key: jwtSecret()},
@@ -38,42 +99,51 @@ func JWTMiddleware() fiber.Handler {
 	})
 }
 
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
+// SignupRequest is the body for POST /api/v1/auth/signup
+type SignupRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// Signup handles POST /api/v1/auth/signup
+func Signup(c *fiber.Ctx) error {
+	var req SignupRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: "invalid request body"})
+	}
+	if len(req.Username) < 3 {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: "username must be at least 3 characters"})
+	}
+	if len(req.Password) < 6 {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: "password must be at least 6 characters"})
+	}
+	if err := users.create(req.Username, req.Password); err != nil {
+		return c.Status(fiber.StatusConflict).JSON(models.ErrorResponse{Error: err.Error()})
+	}
+	token, err := makeToken(req.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: "failed to generate token"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(models.LoginResponse{Token: token})
+}
+
 // Login handles POST /api/v1/auth/login
-// Returns a signed JWT valid for 24 hours.
 func Login(c *fiber.Ctx) error {
 	var req models.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "invalid request body",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: "invalid request body"})
 	}
-
-	hashedPassword, ok := demoUsers[req.Username]
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(models.ErrorResponse{
-			Error: models.ErrInvalidCredentials.Error(),
-		})
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password)); err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(models.ErrorResponse{
-			Error: models.ErrInvalidCredentials.Error(),
-		})
-	}
-
-	claims := jwt.MapClaims{
-		"sub":  req.Username,
-		"role": "operator",
-		"exp":  time.Now().Add(24 * time.Hour).Unix(),
-		"iat":  time.Now().Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(jwtSecret())
+	u, err := users.verify(req.Username, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "failed to generate token",
-		})
+		return c.Status(fiber.StatusUnauthorized).JSON(models.ErrorResponse{Error: models.ErrInvalidCredentials.Error()})
 	}
-
-	return c.JSON(models.LoginResponse{Token: signed})
+	token, err := makeToken(u.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: "failed to generate token"})
+	}
+	return c.JSON(models.LoginResponse{Token: token})
 }

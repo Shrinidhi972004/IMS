@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -23,8 +24,8 @@ func SetupRoutes(
 ) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "IMS — Incident Management System",
-		ReadTimeout:  10,
-		WriteTimeout: 10,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 		// Return errors as JSON
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
@@ -71,6 +72,7 @@ func SetupRoutes(
 	app.Get("/metrics", MetricsHandler()) // Prometheus scrape endpoint
 
 	// Auth
+	app.Post("/api/v1/auth/signup", Signup)
 	app.Post("/api/v1/auth/login", Login)
 
 	// WebSocket upgrade check
