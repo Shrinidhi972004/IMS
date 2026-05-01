@@ -1,0 +1,26 @@
+# Go
+backend/vendor/
+backend/*.exe
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes (local dev)
+postgres-data/
+mongo-data/
+redis-data/
