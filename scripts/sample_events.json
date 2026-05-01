@@ -1,0 +1,84 @@
+{
+  "_comment": "Sample signal payloads for IMS. Use with: curl -X POST http://localhost:8080/api/v1/signals -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' -d @scripts/sample_events.json",
+
+  "scenarios": {
+    "rdbms_outage": {
+      "component_id":   "RDBMS_PRIMARY",
+      "component_type": "RDBMS",
+      "severity":       "P0",
+      "message":        "FATAL: connection pool exhausted — max_connections (500) reached",
+      "metadata": {
+        "host":          "db-primary-01.internal",
+        "port":          5432,
+        "error_code":    "53300",
+        "connections":   500,
+        "region":        "ap-south-1"
+      }
+    },
+
+    "mcp_host_failure": {
+      "component_id":   "MCP_HOST_02",
+      "component_type": "MCP_HOST",
+      "severity":       "P1",
+      "message":        "MCP host health check failed: upstream RDBMS_PRIMARY unreachable after 3 retries",
+      "metadata": {
+        "host":          "mcp-host-02.internal",
+        "upstream":      "RDBMS_PRIMARY",
+        "retry_count":   3,
+        "timeout_ms":    30000
+      }
+    },
+
+    "cache_miss_spike": {
+      "component_id":   "CACHE_CLUSTER_01",
+      "component_type": "CACHE",
+      "severity":       "P2",
+      "message":        "Cache miss rate exceeded threshold: 87% (threshold: 80%)",
+      "metadata": {
+        "cluster":       "cache-cluster-01",
+        "miss_rate_pct": 87,
+        "threshold_pct": 80,
+        "evictions":     15420
+      }
+    },
+
+    "api_latency": {
+      "component_id":   "API_GATEWAY_PROD",
+      "component_type": "API",
+      "severity":       "P1",
+      "message":        "p99 latency exceeded SLO: 4.2s (SLO: 2s)",
+      "metadata": {
+        "endpoint":     "/api/v1/checkout",
+        "p99_ms":       4200,
+        "slo_ms":       2000,
+        "error_rate":   "12%"
+      }
+    },
+
+    "nosql_replication_lag": {
+      "component_id":   "MONGO_REPLICA_SET",
+      "component_type": "NOSQL",
+      "severity":       "P1",
+      "message":        "MongoDB replication lag exceeded 60s on secondary nodes",
+      "metadata": {
+        "replica_set":  "rs0",
+        "lag_seconds":  72,
+        "threshold_s":  60,
+        "secondaries":  ["mongo-02", "mongo-03"]
+      }
+    },
+
+    "queue_backpressure": {
+      "component_id":   "KAFKA_CLUSTER_PROD",
+      "component_type": "QUEUE",
+      "severity":       "P0",
+      "message":        "Kafka consumer lag critical: 2.4M messages unprocessed on topic payments.events",
+      "metadata": {
+        "topic":         "payments.events",
+        "consumer_group": "payment-processor",
+        "lag":           2400000,
+        "threshold":     100000
+      }
+    }
+  }
+}
