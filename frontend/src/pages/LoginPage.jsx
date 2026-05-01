@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import api from '../lib/api'
-import { setToken } from '../lib/api'
+import api, { setToken } from '../lib/api'
 
 export default function LoginPage({ onLogin }) {
   const [mode, setMode] = useState('login')
@@ -27,70 +26,81 @@ export default function LoginPage({ onLogin }) {
   }
 
   return (
-    <div style={styles.root}>
-      <div style={styles.terminal}>
-        <div style={styles.termHeader}>
-          <span style={styles.dot} />
-          <span style={{ ...styles.dot, background: '#ff8c00' }} />
-          <span style={{ ...styles.dot, background: '#4caf7d' }} />
-          <span style={styles.termTitle}>ims-auth — bash</span>
-        </div>
-        <div style={styles.boot}>
-          <div style={styles.bootLine}>IMS v1.0.0 — Incident Management System</div>
-          <div style={{ ...styles.bootLine, color: '#3d5166' }}>Loading subsystems...</div>
-          <div style={{ ...styles.bootLine, color: '#4caf7d' }}>[  OK  ] Postgres · MongoDB · Redis · Workers</div>
-          <div style={styles.bootLine}>Awaiting operator authentication.</div>
-        </div>
-        <div style={styles.tabs}>
-          <button style={{ ...styles.tab, ...(mode === 'login' ? styles.tabActive : {}) }} onClick={() => { setMode('login'); setError('') }}>LOGIN</button>
-          <button style={{ ...styles.tab, ...(mode === 'signup' ? styles.tabActive : {}) }} onClick={() => { setMode('signup'); setError('') }}>REGISTER</button>
-        </div>
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.field}>
-            <label style={styles.label}>USERNAME</label>
-            <div style={styles.inputRow}>
-              <span style={styles.prompt}>$</span>
-              <input style={styles.input} type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="username" autoFocus autoComplete="username" spellCheck={false} minLength={3} required />
-            </div>
+    <div style={s.root}>
+      <div style={s.card}>
+        {/* Logo */}
+        <div style={s.logo}>
+          <div style={s.logoIcon}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
           </div>
-          <div style={styles.field}>
-            <label style={styles.label}>PASSWORD {mode === 'signup' && <span style={{ color: '#3d5166', fontSize: 9 }}>(min 6 chars)</span>}</label>
-            <div style={styles.inputRow}>
-              <span style={styles.prompt}>$</span>
-              <input style={styles.input} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={6} required />
-            </div>
+          <div>
+            <div style={s.logoName}>IMS</div>
+            <div style={s.logoSub}>Incident Management System</div>
           </div>
-          {error && <div style={styles.error}>✗ {error}</div>}
-          <button type="submit" style={styles.btn} disabled={loading}>
-            {loading ? (mode === 'login' ? 'AUTHENTICATING...' : 'CREATING...') : (mode === 'login' ? '[ LOGIN ]' : '[ CREATE ACCOUNT ]')}
+        </div>
+
+        <h2 style={s.heading}>{mode === 'login' ? 'Welcome back' : 'Create account'}</h2>
+        <p style={s.subheading}>{mode === 'login' ? 'Sign in to your account to continue' : 'Get started with IMS'}</p>
+
+        {/* Tabs */}
+        <div style={s.tabs}>
+          <button style={{ ...s.tab, ...(mode === 'login' ? s.tabActive : {}) }} onClick={() => { setMode('login'); setError('') }}>Sign in</button>
+          <button style={{ ...s.tab, ...(mode === 'signup' ? s.tabActive : {}) }} onClick={() => { setMode('signup'); setError('') }}>Register</button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={s.form}>
+          <div style={s.field}>
+            <label style={s.label}>Username</label>
+            <input className="input" type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter your username" autoFocus autoComplete="username" minLength={3} required />
+          </div>
+          <div style={s.field}>
+            <label style={s.label}>Password {mode === 'signup' && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(min. 6 characters)</span>}</label>
+            <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={6} required />
+          </div>
+
+          {error && (
+            <div style={s.error}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {error}
+            </div>
+          )}
+
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '10px' }} disabled={loading}>
+            {loading ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : null}
+            {loading ? 'Please wait...' : (mode === 'login' ? 'Sign in' : 'Create account')}
           </button>
         </form>
-        <div style={styles.footer}>
-          {mode === 'login' ? 'No account? Switch to REGISTER above.' : 'Already registered? Switch to LOGIN above.'}
-        </div>
+
+        <p style={s.switchMode}>
+          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          <button style={s.switchBtn} onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError('') }}>
+            {mode === 'login' ? 'Register' : 'Sign in'}
+          </button>
+        </p>
       </div>
     </div>
   )
 }
 
-const styles = {
-  root: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  terminal: { background: '#0d1117', border: '1px solid #1e2d3d', borderRadius: 6, width: '100%', maxWidth: 480, overflow: 'hidden', boxShadow: '0 0 60px rgba(0,0,0,0.6)' },
-  termHeader: { background: '#131920', borderBottom: '1px solid #1e2d3d', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: '50%', background: '#ff3b3b', display: 'inline-block' },
-  termTitle: { fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: '#3d5166', marginLeft: 8, letterSpacing: '0.05em' },
-  boot: { padding: '16px 24px 8px' },
-  bootLine: { fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: '#6b8299', marginBottom: 3 },
-  tabs: { display: 'flex', borderBottom: '1px solid #1e2d3d', marginTop: 8 },
-  tab: { flex: 1, background: 'transparent', border: 'none', borderBottom: '2px solid transparent', color: '#3d5166', fontFamily: "'Share Tech Mono', monospace", fontSize: 11, letterSpacing: '0.1em', padding: '10px', cursor: 'pointer' },
-  tabActive: { color: '#3b9eff', borderBottom: '2px solid #3b9eff', background: 'rgba(59,158,255,0.05)' },
-  form: { padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 },
+const s = {
+  root: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg)' },
+  card: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' },
+  logo: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 },
+  logoIcon: { width: 40, height: 40, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  logoName: { fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' },
+  logoSub: { fontSize: 11, color: 'var(--text3)', marginTop: 1 },
+  heading: { fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 6 },
+  subheading: { fontSize: 14, color: 'var(--text2)', marginBottom: 24 },
+  tabs: { display: 'flex', background: 'var(--surface2)', borderRadius: 8, padding: 3, marginBottom: 24 },
+  tab: { flex: 1, padding: '7px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500, color: 'var(--text2)', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'all 0.15s' },
+  tabActive: { background: 'var(--surface)', color: 'var(--text)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+  form: { display: 'flex', flexDirection: 'column', gap: 16 },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
-  label: { fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: '0.15em', color: '#3b9eff', display: 'flex', alignItems: 'center', gap: 8 },
-  inputRow: { display: 'flex', alignItems: 'center', gap: 8, background: '#080b0f', border: '1px solid #1e2d3d', borderRadius: 4, padding: '0 12px' },
-  prompt: { fontFamily: "'Share Tech Mono', monospace", color: '#4caf7d', fontSize: 14, flexShrink: 0 },
-  input: { background: 'transparent', border: 'none', color: '#c9d8e8', fontFamily: "'Share Tech Mono', monospace", fontSize: 13, padding: '10px 0', outline: 'none', width: '100%' },
-  error: { fontFamily: "'Share Tech Mono', monospace", fontSize: 12, color: '#ff3b3b', background: 'rgba(255,59,59,0.08)', border: '1px solid rgba(255,59,59,0.2)', borderRadius: 4, padding: '8px 12px' },
-  btn: { background: 'transparent', border: '1px solid #3b9eff', color: '#3b9eff', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: '0.1em', padding: '12px 24px', borderRadius: 4, cursor: 'pointer', marginTop: 4 },
-  footer: { fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: '#3d5166', textAlign: 'center', padding: '0 24px 16px' },
+  label: { fontSize: 13, fontWeight: 500, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 },
+  error: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--p0-bg)', border: '1px solid var(--p0-border)', borderRadius: 8, fontSize: 13, color: 'var(--p0)' },
+  switchMode: { textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text2)' },
+  switchBtn: { background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer', fontSize: 13 },
 }

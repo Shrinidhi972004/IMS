@@ -3,53 +3,29 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import api from '../lib/api'
 
-const ROOT_CAUSE_CATEGORIES = [
-  'INFRASTRUCTURE',
-  'APPLICATION',
-  'NETWORK',
-  'DATABASE',
-  'THIRD_PARTY',
-  'HUMAN_ERROR',
-  'UNKNOWN',
-]
+const CATEGORIES = ['INFRASTRUCTURE','APPLICATION','NETWORK','DATABASE','THIRD_PARTY','HUMAN_ERROR','UNKNOWN']
+const now = () => format(new Date(), "yyyy-MM-dd'T'HH:mm")
 
 export default function RCAForm() {
   const { id } = useParams()
   const navigate = useNavigate()
-
-  const now = format(new Date(), "yyyy-MM-dd'T'HH:mm")
-
-  const [form, setForm] = useState({
-    incident_start: now,
-    incident_end: now,
-    root_cause_category: '',
-    root_cause_detail: '',
-    fix_applied: '',
-    prevention_steps: '',
-  })
+  const [form, setForm] = useState({ incident_start: now(), incident_end: now(), root_cause_category: '', root_cause_detail: '', fix_applied: '', prevention_steps: '' })
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [serverError, setServerError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  function set(field, value) {
-    setForm(f => ({ ...f, [field]: value }))
-    setErrors(e => ({ ...e, [field]: '' }))
-  }
+  function set(field, value) { setForm(f => ({ ...f, [field]: value })); setErrors(e => ({ ...e, [field]: '' })) }
 
   function validate() {
     const errs = {}
     if (!form.incident_start) errs.incident_start = 'Required'
-    if (!form.incident_end)   errs.incident_end = 'Required'
-    if (form.incident_end <= form.incident_start)
-      errs.incident_end = 'End must be after start'
+    if (!form.incident_end) errs.incident_end = 'Required'
+    if (form.incident_end <= form.incident_start) errs.incident_end = 'End must be after start'
     if (!form.root_cause_category) errs.root_cause_category = 'Required'
-    if (form.root_cause_detail.length < 20)
-      errs.root_cause_detail = 'Minimum 20 characters'
-    if (form.fix_applied.length < 10)
-      errs.fix_applied = 'Minimum 10 characters'
-    if (form.prevention_steps.length < 10)
-      errs.prevention_steps = 'Minimum 10 characters'
+    if (form.root_cause_detail.length < 20) errs.root_cause_detail = 'Minimum 20 characters'
+    if (form.fix_applied.length < 10) errs.fix_applied = 'Minimum 10 characters'
+    if (form.prevention_steps.length < 10) errs.prevention_steps = 'Minimum 10 characters'
     return errs
   }
 
@@ -57,155 +33,89 @@ export default function RCAForm() {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
-
-    setSubmitting(true)
-    setServerError('')
+    setSubmitting(true); setServerError('')
     try {
-      await api.submitRCA(id, {
-        ...form,
-        incident_start: new Date(form.incident_start).toISOString(),
-        incident_end:   new Date(form.incident_end).toISOString(),
-      })
+      await api.submitRCA(id, { ...form, incident_start: new Date(form.incident_start).toISOString(), incident_end: new Date(form.incident_end).toISOString() })
       setSuccess(true)
-      setTimeout(() => navigate(`/incident/${id}`), 1800)
-    } catch (err) {
-      setServerError(err.message)
-    } finally {
-      setSubmitting(false)
-    }
+      setTimeout(() => navigate(`/incident/${id}`), 1500)
+    } catch (err) { setServerError(err.message) }
+    finally { setSubmitting(false) }
   }
 
-  if (success) {
-    return (
-      <div style={styles.successWrap}>
-        <div style={styles.successBox}>
-          <div style={styles.successIcon}>✓</div>
-          <div style={styles.successTitle}>RCA SUBMITTED</div>
-          <div style={styles.successSub}>Redirecting to incident…</div>
-        </div>
-      </div>
-    )
-  }
-
-  // MTTR preview
-  const mttrPreview = form.incident_start && form.incident_end
+  const mttr = form.incident_start && form.incident_end
     ? Math.max(0, (new Date(form.incident_end) - new Date(form.incident_start)) / 60000).toFixed(1)
     : null
 
-  return (
-    <div style={styles.root}>
-      <button style={styles.backBtn} onClick={() => navigate(`/incident/${id}`)}>
-        ← BACK TO INCIDENT
-      </button>
+  if (success) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 400 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>RCA Submitted</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)' }}>Redirecting to incident...</div>
+      </div>
+    </div>
+  )
 
-      <div style={styles.header}>
-        <h1 style={styles.title}>ROOT CAUSE ANALYSIS</h1>
-        <div style={styles.subtitle} className="mono">
-          Work Item: {id}
-        </div>
+  return (
+    <div style={s.root}>
+      <div style={s.breadcrumb}>
+        <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => navigate(`/incident/${id}`)}>← Back to incident</button>
       </div>
 
-      <form onSubmit={handleSubmit} style={styles.form}>
-        {/* Timeline section */}
-        <FormSection title="INCIDENT TIMELINE">
-          <div style={styles.grid2}>
-            <FormField label="INCIDENT START" error={errors.incident_start} required>
-              <input
-                type="datetime-local"
-                value={form.incident_start}
-                onChange={e => set('incident_start', e.target.value)}
-                style={inputStyle(errors.incident_start)}
-              />
-            </FormField>
-            <FormField label="INCIDENT END" error={errors.incident_end} required>
-              <input
-                type="datetime-local"
-                value={form.incident_end}
-                onChange={e => set('incident_end', e.target.value)}
-                style={inputStyle(errors.incident_end)}
-              />
-            </FormField>
+      <div style={s.header}>
+        <h1 style={s.title}>Root Cause Analysis</h1>
+        <p style={s.sub}>Work item: <code style={{ fontSize: 12, background: 'var(--surface2)', padding: '2px 6px', borderRadius: 4 }}>{id}</code></p>
+      </div>
+
+      <form onSubmit={handleSubmit} style={s.form}>
+        {/* Timeline */}
+        <Card title="Incident timeline">
+          <div style={s.grid2}>
+            <Field label="Start time" error={errors.incident_start}>
+              <input className={`input${errors.incident_start ? ' error' : ''}`} type="datetime-local" value={form.incident_start} onChange={e => set('incident_start', e.target.value)} />
+            </Field>
+            <Field label="End time" error={errors.incident_end}>
+              <input className={`input${errors.incident_end ? ' error' : ''}`} type="datetime-local" value={form.incident_end} onChange={e => set('incident_end', e.target.value)} />
+            </Field>
           </div>
-          {mttrPreview !== null && (
-            <div style={styles.mttrPreview}>
-              Calculated MTTR: <span style={{ color: 'var(--accent)' }}>{mttrPreview} minutes</span>
+          {mttr && (
+            <div style={s.mttrPreview}>
+              <span style={{ color: 'var(--text2)' }}>Calculated MTTR:</span>
+              <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{mttr} minutes</span>
             </div>
           )}
-        </FormSection>
+        </Card>
 
-        {/* Root cause section */}
-        <FormSection title="ROOT CAUSE">
-          <FormField label="CATEGORY" error={errors.root_cause_category} required>
-            <select
-              value={form.root_cause_category}
-              onChange={e => set('root_cause_category', e.target.value)}
-              style={inputStyle(errors.root_cause_category)}
-            >
-              <option value="">— select category —</option>
-              {ROOT_CAUSE_CATEGORIES.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+        {/* Root cause */}
+        <Card title="Root cause">
+          <Field label="Category" error={errors.root_cause_category}>
+            <select className={`input${errors.root_cause_category ? ' error' : ''}`} value={form.root_cause_category} onChange={e => set('root_cause_category', e.target.value)}>
+              <option value="">Select category...</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
             </select>
-          </FormField>
+          </Field>
+          <Field label={`Root cause detail (${form.root_cause_detail.length}/20 min)`} error={errors.root_cause_detail}>
+            <textarea className={`input${errors.root_cause_detail ? ' error' : ''}`} rows={4} value={form.root_cause_detail} onChange={e => set('root_cause_detail', e.target.value)} placeholder="Describe what failed, why it failed, and the chain of events..." style={{ resize: 'vertical' }} />
+          </Field>
+        </Card>
 
-          <FormField
-            label={`ROOT CAUSE DETAIL (${form.root_cause_detail.length}/20 min)`}
-            error={errors.root_cause_detail}
-            required
-          >
-            <textarea
-              value={form.root_cause_detail}
-              onChange={e => set('root_cause_detail', e.target.value)}
-              rows={4}
-              placeholder="Describe the root cause in detail. What failed, why it failed, and the chain of events that led to the incident."
-              style={inputStyle(errors.root_cause_detail)}
-            />
-          </FormField>
-        </FormSection>
+        {/* Remediation */}
+        <Card title="Remediation">
+          <Field label={`Fix applied (${form.fix_applied.length}/10 min)`} error={errors.fix_applied}>
+            <textarea className={`input${errors.fix_applied ? ' error' : ''}`} rows={3} value={form.fix_applied} onChange={e => set('fix_applied', e.target.value)} placeholder="Describe the immediate fix or workaround applied..." style={{ resize: 'vertical' }} />
+          </Field>
+          <Field label={`Prevention steps (${form.prevention_steps.length}/10 min)`} error={errors.prevention_steps}>
+            <textarea className={`input${errors.prevention_steps ? ' error' : ''}`} rows={3} value={form.prevention_steps} onChange={e => set('prevention_steps', e.target.value)} placeholder="List preventative actions to avoid recurrence..." style={{ resize: 'vertical' }} />
+          </Field>
+        </Card>
 
-        {/* Remediation section */}
-        <FormSection title="REMEDIATION">
-          <FormField
-            label={`FIX APPLIED (${form.fix_applied.length}/10 min)`}
-            error={errors.fix_applied}
-            required
-          >
-            <textarea
-              value={form.fix_applied}
-              onChange={e => set('fix_applied', e.target.value)}
-              rows={3}
-              placeholder="Describe the immediate fix or workaround that was applied to resolve the incident."
-              style={inputStyle(errors.fix_applied)}
-            />
-          </FormField>
+        {serverError && <div style={s.serverError}>{serverError}</div>}
 
-          <FormField
-            label={`PREVENTION STEPS (${form.prevention_steps.length}/10 min)`}
-            error={errors.prevention_steps}
-            required
-          >
-            <textarea
-              value={form.prevention_steps}
-              onChange={e => set('prevention_steps', e.target.value)}
-              rows={3}
-              placeholder="List the preventative actions, process improvements, or monitoring changes to prevent recurrence."
-              style={inputStyle(errors.prevention_steps)}
-            />
-          </FormField>
-        </FormSection>
-
-        {/* Server error */}
-        {serverError && (
-          <div style={styles.serverError}>✗ {serverError}</div>
-        )}
-
-        {/* Submit */}
-        <div style={styles.actions}>
-          <button type="button" style={styles.cancelBtn} onClick={() => navigate(`/incident/${id}`)}>
-            CANCEL
-          </button>
-          <button type="submit" style={styles.submitBtn} disabled={submitting}>
-            {submitting ? 'SUBMITTING…' : '[ SUBMIT RCA ]'}
+        <div style={s.actions}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(`/incident/${id}`)}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? <span className="spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : null}
+            {submitting ? 'Submitting...' : 'Submit RCA'}
           </button>
         </div>
       </form>
@@ -213,189 +123,34 @@ export default function RCAForm() {
   )
 }
 
-function FormSection({ title, children }) {
+function Card({ title, children }) {
   return (
-    <div style={styles.section}>
-      <div style={styles.sectionTitle}>{title}</div>
-      <div style={styles.sectionBody}>{children}</div>
+    <div className="card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
+      <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>{children}</div>
     </div>
   )
 }
 
-function FormField({ label, error, required, children }) {
+function Field({ label, error, children }) {
   return (
-    <div style={styles.fieldWrap}>
-      <label style={styles.label}>
-        {label}
-        {required && <span style={{ color: 'var(--p0)', marginLeft: 4 }}>*</span>}
-      </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{label}</label>
       {children}
-      {error && <div style={styles.fieldError}>{error}</div>}
+      {error && <span style={{ fontSize: 12, color: 'var(--p0)' }}>{error}</span>}
     </div>
   )
 }
 
-function inputStyle(error) {
-  return {
-    borderColor: error ? 'var(--p0)' : undefined,
-  }
-}
-
-const styles = {
-  root: {
-    padding: '20px 24px',
-    maxWidth: 900,
-    margin: '0 auto',
-  },
-  backBtn: {
-    background: 'transparent',
-    border: '1px solid var(--border)',
-    color: 'var(--text-secondary)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    letterSpacing: '0.08em',
-    padding: '6px 14px',
-    borderRadius: 'var(--radius)',
-    cursor: 'pointer',
-    marginBottom: 20,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontFamily: 'var(--font-display)',
-    fontWeight: 700,
-    fontSize: 24,
-    letterSpacing: '0.08em',
-    color: 'var(--text-primary)',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: 'var(--text-muted)',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  section: {
-    background: 'var(--bg-surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)',
-    overflow: 'hidden',
-  },
-  sectionTitle: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 10,
-    letterSpacing: '0.12em',
-    color: 'var(--text-muted)',
-    padding: '10px 16px',
-    background: 'var(--bg-raised)',
-    borderBottom: '1px solid var(--border)',
-  },
-  sectionBody: {
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  grid2: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 16,
-  },
-  mttrPreview: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 12,
-    color: 'var(--text-secondary)',
-    padding: '8px 12px',
-    background: 'var(--bg-raised)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-  },
-  fieldWrap: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  label: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 9,
-    letterSpacing: '0.12em',
-    color: 'var(--text-muted)',
-  },
-  fieldError: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    color: 'var(--p0)',
-  },
-  serverError: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 12,
-    color: 'var(--p0)',
-    background: 'var(--p0-dim)',
-    border: '1px solid rgba(255,59,59,0.2)',
-    borderRadius: 'var(--radius)',
-    padding: '12px 16px',
-  },
-  actions: {
-    display: 'flex',
-    gap: 12,
-    justifyContent: 'flex-end',
-    paddingTop: 8,
-  },
-  cancelBtn: {
-    background: 'transparent',
-    border: '1px solid var(--border)',
-    color: 'var(--text-secondary)',
-    fontFamily: 'var(--font-display)',
-    fontWeight: 600,
-    fontSize: 12,
-    letterSpacing: '0.08em',
-    padding: '10px 24px',
-    borderRadius: 'var(--radius)',
-    cursor: 'pointer',
-  },
-  submitBtn: {
-    background: 'var(--accent-dim)',
-    border: '1px solid var(--accent)',
-    color: 'var(--accent)',
-    fontFamily: 'var(--font-display)',
-    fontWeight: 700,
-    fontSize: 13,
-    letterSpacing: '0.1em',
-    padding: '10px 32px',
-    borderRadius: 'var(--radius)',
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-  },
-  successWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 400,
-  },
-  successBox: {
-    textAlign: 'center',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  successIcon: {
-    fontSize: 48,
-    color: 'var(--state-closed)',
-  },
-  successTitle: {
-    fontFamily: 'var(--font-display)',
-    fontWeight: 700,
-    fontSize: 22,
-    letterSpacing: '0.1em',
-    color: 'var(--state-closed)',
-  },
-  successSub: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 12,
-    color: 'var(--text-muted)',
-  },
+const s = {
+  root: { padding: '24px 32px', maxWidth: 860, margin: '0 auto' },
+  breadcrumb: { marginBottom: 20 },
+  header: { marginBottom: 24 },
+  title: { fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 6 },
+  sub: { fontSize: 13, color: 'var(--text2)' },
+  form: { display: 'flex', flexDirection: 'column', gap: 16 },
+  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 },
+  mttrPreview: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--accent-light)', borderRadius: 8, fontSize: 13, marginTop: 4 },
+  serverError: { padding: '10px 14px', background: 'var(--p0-bg)', border: '1px solid var(--p0-border)', borderRadius: 8, fontSize: 13, color: 'var(--p0)' },
+  actions: { display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 },
 }

@@ -4,11 +4,13 @@ import { formatDistanceToNow } from 'date-fns'
 import api from '../lib/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 
+const FILTERS = ['All', 'Open', 'Investigating', 'Resolved', 'Closed']
+
 export default function LiveFeed({ onWsConnect }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('All')
   const [error, setError] = useState(null)
-  const [filter, setFilter] = useState('ALL')
   const navigate = useNavigate()
 
   const load = useCallback(async () => {
@@ -16,289 +18,149 @@ export default function LiveFeed({ onWsConnect }) {
       const res = await api.listWorkItems()
       setItems(res.data || [])
       setError(null)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { setError(e.message) }
+    finally { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // WebSocket — refresh list on any incident update
   const handleWsMessage = useCallback((msg) => {
-    if (msg.type === 'incident_update' || msg.type === 'dashboard_update') {
-      load()
-    }
+    if (msg.type === 'incident_update' || msg.type === 'dashboard_update') load()
     if (onWsConnect) onWsConnect(true)
   }, [load, onWsConnect])
 
   useWebSocket(handleWsMessage)
 
   const filtered = items.filter(wi => {
-    if (filter === 'ALL') return true
-    if (filter === 'ACTIVE') return wi.state === 'OPEN' || wi.state === 'INVESTIGATING'
-    return wi.state === filter
+    if (filter === 'All') return true
+    return wi.state === filter.toUpperCase()
   })
 
+  const counts = {
+    All: items.length,
+    Open: items.filter(i => i.state === 'OPEN').length,
+    Investigating: items.filter(i => i.state === 'INVESTIGATING').length,
+    Resolved: items.filter(i => i.state === 'RESOLVED').length,
+    Closed: items.filter(i => i.state === 'CLOSED').length,
+  }
+
   return (
-    <div style={styles.root}>
-      {/* Section header */}
-      <div style={styles.header}>
-        <div style={styles.titleRow}>
-          <span style={styles.pulseWrap}>
-            <span className="pulse-dot" />
-          </span>
-          <h2 style={styles.title}>ACTIVE INCIDENTS</h2>
-          <span style={styles.count}>{filtered.length}</span>
+    <div style={s.root}>
+      {/* Page header */}
+      <div style={s.pageHeader}>
+        <div>
+          <h1 style={s.pageTitle}>Incidents</h1>
+          <p style={s.pageDesc}>Monitor and manage all active incidents across your stack</p>
         </div>
-
-        {/* Filter tabs */}
-        <div style={styles.filters}>
-          {['ALL', 'ACTIVE', 'OPEN', 'INVESTIGATING', 'RESOLVED', 'CLOSED'].map(f => (
-            <button
-              key={f}
-              style={{
-                ...styles.filterBtn,
-                ...(filter === f ? styles.filterBtnActive : {}),
-              }}
-              onClick={() => setFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="live-dot" />
+          <span style={{ fontSize: 12, color: 'var(--text2)' }}>Live updates</span>
         </div>
       </div>
 
-      {/* Column headers */}
-      <div style={styles.tableHead}>
-        <span style={{ width: 60 }}>SEV</span>
-        <span style={{ flex: 1 }}>INCIDENT</span>
-        <span style={{ width: 120 }}>COMPONENT</span>
-        <span style={{ width: 100 }}>STATE</span>
-        <span style={{ width: 80 }}>SIGNALS</span>
-        <span style={{ width: 120 }}>AGE</span>
-      </div>
-
-      {/* Rows */}
-      <div style={styles.list}>
-        {loading && (
-          <div style={styles.center}>
-            <div className="spinner" />
-          </div>
-        )}
-        {error && (
-          <div style={styles.errorMsg}>✗ {error}</div>
-        )}
-        {!loading && filtered.length === 0 && (
-          <div style={styles.empty}>
-            <span style={styles.emptyIcon}>◎</span>
-            <span>No incidents match filter</span>
-          </div>
-        )}
-        {filtered.map((wi, i) => (
-          <IncidentRow
-            key={wi.id}
-            wi={wi}
-            index={i}
-            onClick={() => navigate(`/incident/${wi.id}`)}
-          />
+      {/* Filter tabs */}
+      <div style={s.filterBar}>
+        {FILTERS.map(f => (
+          <button key={f} style={{ ...s.filterTab, ...(filter === f ? s.filterTabActive : {}) }} onClick={() => setFilter(f)}>
+            {f}
+            <span style={{ ...s.filterCount, ...(filter === f ? s.filterCountActive : {}) }}>{counts[f]}</span>
+          </button>
         ))}
+      </div>
+
+      {/* Table */}
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <table style={s.table}>
+          <thead>
+            <tr style={s.thead}>
+              <th style={{ ...s.th, width: 80 }}>Severity</th>
+              <th style={s.th}>Incident</th>
+              <th style={{ ...s.th, width: 140 }}>Component</th>
+              <th style={{ ...s.th, width: 120 }}>Status</th>
+              <th style={{ ...s.th, width: 80, textAlign: 'right' }}>Signals</th>
+              <th style={{ ...s.th, width: 110, textAlign: 'right' }}>Age</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={6} style={s.center}><span className="spinner" /></td></tr>
+            )}
+            {error && (
+              <tr><td colSpan={6} style={s.center}><span style={{ color: 'var(--p0)', fontSize: 13 }}>{error}</span></td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={6} style={s.center}>
+                <div style={{ color: 'var(--text3)', fontSize: 13 }}>No incidents found</div>
+              </td></tr>
+            )}
+            {filtered.map((wi, i) => (
+              <IncidentRow key={wi.id} wi={wi} index={i} onClick={() => navigate(`/incident/${wi.id}`)} />
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
 
 function IncidentRow({ wi, onClick, index }) {
-  const severityColor = {
-    P0: 'var(--p0)', P1: 'var(--p1)', P2: 'var(--p2)',
-  }[wi.severity] || 'var(--text-secondary)'
-
-  const age = formatDistanceToNow(new Date(wi.created_at), { addSuffix: false })
+  const [hovered, setHovered] = useState(false)
+  const severityLeft = { P0: 'var(--p0)', P1: 'var(--p1)', P2: 'var(--p2)' }[wi.severity] || 'var(--border)'
 
   return (
-    <div
-      style={{
-        ...styles.row,
-        animationDelay: `${index * 30}ms`,
-        borderLeft: `3px solid ${severityColor}`,
-      }}
+    <tr
+      style={{ ...s.tr, background: hovered ? 'var(--surface2)' : 'transparent', cursor: 'pointer' }}
       className="fade-up"
+      style={{ animationDelay: `${index * 20}ms`, cursor: 'pointer', background: hovered ? 'var(--surface2)' : 'transparent' }}
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {/* Severity */}
-      <span style={{ width: 60 }}>
-        <span className={`badge badge-${wi.severity}`}>{wi.severity}</span>
-      </span>
-
-      {/* Title */}
-      <span style={{ flex: 1 }}>
-        <div style={styles.rowTitle}>{wi.title}</div>
-        <div style={styles.rowId} className="mono">{wi.id.slice(0, 8)}…</div>
-      </span>
-
-      {/* Component */}
-      <span style={{ width: 120 }}>
-        <div style={styles.component} className="mono">{wi.component_id}</div>
-        <div style={styles.compType}>{wi.component_type}</div>
-      </span>
-
-      {/* State */}
-      <span style={{ width: 100 }}>
+      <td style={{ ...s.td, paddingLeft: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, paddingLeft: 20 }}>
+          <div style={{ width: 3, height: 36, background: severityLeft, borderRadius: 2, marginRight: 12, flexShrink: 0 }} />
+          <span className={`badge badge-${wi.severity}`}>{wi.severity}</span>
+        </div>
+      </td>
+      <td style={s.td}>
+        <div style={s.rowTitle}>{wi.title}</div>
+        <div style={s.rowId}>{wi.id.slice(0, 8)}...</div>
+      </td>
+      <td style={s.td}>
+        <div style={s.compId}>{wi.component_id}</div>
+        <div style={s.compType}>{wi.component_type}</div>
+      </td>
+      <td style={s.td}>
         <span className={`state-badge state-${wi.state}`}>{wi.state}</span>
-      </span>
-
-      {/* Signal count */}
-      <span style={{ width: 80 }}>
-        <span style={styles.sigCount} className="mono">{wi.signal_count}</span>
-      </span>
-
-      {/* Age */}
-      <span style={{ width: 120 }}>
-        <span style={styles.age} className="mono">{age}</span>
-      </span>
-    </div>
+      </td>
+      <td style={{ ...s.td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text2)', fontSize: 13 }}>
+        {wi.signal_count}
+      </td>
+      <td style={{ ...s.td, textAlign: 'right', color: 'var(--text3)', fontSize: 12 }}>
+        {formatDistanceToNow(new Date(wi.created_at))}
+      </td>
+    </tr>
   )
 }
 
-const styles = {
-  root: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '16px 20px',
-    borderBottom: '1px solid var(--border)',
-    flexShrink: 0,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-  },
-  pulseWrap: {
-    display: 'flex',
-    alignItems: 'center',
-  },
-  title: {
-    fontFamily: 'var(--font-display)',
-    fontWeight: 700,
-    fontSize: 16,
-    letterSpacing: '0.1em',
-    color: 'var(--text-primary)',
-  },
-  count: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 12,
-    color: 'var(--text-secondary)',
-    background: 'var(--bg-raised)',
-    border: '1px solid var(--border)',
-    padding: '1px 8px',
-    borderRadius: 'var(--radius-sm)',
-  },
-  filters: {
-    display: 'flex',
-    gap: 4,
-  },
-  filterBtn: {
-    background: 'transparent',
-    border: '1px solid var(--border)',
-    color: 'var(--text-secondary)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: 10,
-    letterSpacing: '0.08em',
-    padding: '4px 10px',
-    borderRadius: 'var(--radius-sm)',
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-  },
-  filterBtnActive: {
-    background: 'var(--accent-dim)',
-    border: '1px solid var(--accent)',
-    color: 'var(--accent)',
-  },
-  tableHead: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '8px 20px',
-    background: 'var(--bg-raised)',
-    borderBottom: '1px solid var(--border)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: 9,
-    letterSpacing: '0.12em',
-    color: 'var(--text-muted)',
-    flexShrink: 0,
-    gap: 12,
-  },
-  list: {
-    flex: 1,
-    overflowY: 'auto',
-  },
-  row: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 20px',
-    borderBottom: '1px solid var(--border)',
-    cursor: 'pointer',
-    transition: 'background 0.12s',
-    gap: 12,
-  },
-  rowTitle: {
-    color: 'var(--text-primary)',
-    fontSize: 13,
-    fontWeight: 500,
-    marginBottom: 2,
-  },
-  rowId: {
-    fontSize: 10,
-    color: 'var(--text-muted)',
-  },
-  component: {
-    fontSize: 12,
-    color: 'var(--text-mono)',
-  },
-  compType: {
-    fontSize: 10,
-    color: 'var(--text-muted)',
-    marginTop: 2,
-  },
-  sigCount: {
-    fontSize: 14,
-    color: 'var(--text-secondary)',
-  },
-  age: {
-    fontSize: 11,
-    color: 'var(--text-secondary)',
-  },
-  center: {
-    display: 'flex',
-    justifyContent: 'center',
-    padding: 48,
-  },
-  errorMsg: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 12,
-    color: 'var(--p0)',
-    padding: '20px 24px',
-  },
-  empty: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 12,
-    padding: 64,
-    fontFamily: 'var(--font-mono)',
-    fontSize: 12,
-    color: 'var(--text-muted)',
-  },
-  emptyIcon: {
-    fontSize: 32,
-    color: 'var(--border-bright)',
-  },
+const s = {
+  root: { padding: '28px 32px', maxWidth: 1200, margin: '0 auto' },
+  pageHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 },
+  pageTitle: { fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 4 },
+  pageDesc: { fontSize: 13, color: 'var(--text2)' },
+  filterBar: { display: 'flex', gap: 2, marginBottom: 16, background: 'var(--surface2)', borderRadius: 8, padding: 3, alignSelf: 'flex-start', width: 'fit-content' },
+  filterTab: { padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 500, color: 'var(--text2)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' },
+  filterTabActive: { background: 'var(--surface)', color: 'var(--text)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+  filterCount: { fontSize: 11, background: 'var(--border)', color: 'var(--text3)', padding: '1px 6px', borderRadius: 10, fontWeight: 600 },
+  filterCountActive: { background: 'var(--accent-light)', color: 'var(--accent)' },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  thead: { background: 'var(--surface2)' },
+  th: { padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border)' },
+  tr: { borderBottom: '1px solid var(--border)', transition: 'background 0.1s' },
+  td: { padding: '12px 16px', verticalAlign: 'middle' },
+  rowTitle: { fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 2 },
+  rowId: { fontSize: 11, color: 'var(--text3)', fontFamily: 'monospace' },
+  compId: { fontSize: 13, color: 'var(--text)', fontFamily: 'monospace', fontWeight: 500, marginBottom: 1 },
+  compType: { fontSize: 11, color: 'var(--text3)' },
+  center: { padding: '48px 16px', textAlign: 'center' },
 }
