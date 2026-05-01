@@ -31,17 +31,7 @@ func (h *WorkItemHandler) ListWorkItems(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Try hot-path cache first
-	cached, err := h.stores.Redis.GetDashboardState(ctx)
-	if err == nil && cached != nil {
-		return c.JSON(fiber.Map{
-			"data":       cached.ActiveIncidents,
-			"from_cache": true,
-			"updated_at": cached.UpdatedAt,
-		})
-	}
-
-	// Cache miss — query Postgres
+	// Always query Postgres for full list
 	items, err := h.stores.Postgres.ListWorkItems(ctx)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
