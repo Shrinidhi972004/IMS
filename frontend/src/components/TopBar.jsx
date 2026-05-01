@@ -8,7 +8,7 @@ export default function TopBar({ onLogout, wsConnected }) {
   useEffect(() => {
     const fetch = () => api.getDashboard().then(setStats).catch(() => {})
     fetch()
-    const i = setInterval(fetch, 10000)
+    const i = setInterval(fetch, 3000)
     return () => clearInterval(i)
   }, [])
 

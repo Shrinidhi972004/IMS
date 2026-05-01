@@ -22,7 +22,11 @@ export default function LiveFeed({ onWsConnect }) {
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    const interval = setInterval(load, 3000)
+    return () => clearInterval(interval)
+  }, [load])
 
   const handleWsMessage = useCallback((msg) => {
     if (msg.type === 'incident_update' || msg.type === 'dashboard_update') load()
@@ -46,7 +50,6 @@ export default function LiveFeed({ onWsConnect }) {
 
   return (
     <div style={s.root}>
-      {/* Page header */}
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>Incidents</h1>
@@ -58,7 +61,6 @@ export default function LiveFeed({ onWsConnect }) {
         </div>
       </div>
 
-      {/* Filter tabs */}
       <div style={s.filterBar}>
         {FILTERS.map(f => (
           <button key={f} style={{ ...s.filterTab, ...(filter === f ? s.filterTabActive : {}) }} onClick={() => setFilter(f)}>
@@ -68,7 +70,6 @@ export default function LiveFeed({ onWsConnect }) {
         ))}
       </div>
 
-      {/* Table */}
       <div className="card" style={{ overflow: 'hidden' }}>
         <table style={s.table}>
           <thead>
@@ -109,15 +110,14 @@ function IncidentRow({ wi, onClick, index }) {
 
   return (
     <tr
-      style={{ ...s.tr, background: hovered ? 'var(--surface2)' : 'transparent', cursor: 'pointer' }}
       className="fade-up"
-      style={{ animationDelay: `${index * 20}ms`, cursor: 'pointer', background: hovered ? 'var(--surface2)' : 'transparent' }}
+      style={{ animationDelay: `${index * 20}ms`, cursor: 'pointer', background: hovered ? 'var(--surface2)' : 'transparent', borderBottom: '1px solid var(--border)', transition: 'background 0.1s' }}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <td style={{ ...s.td, paddingLeft: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0, paddingLeft: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 20 }}>
           <div style={{ width: 3, height: 36, background: severityLeft, borderRadius: 2, marginRight: 12, flexShrink: 0 }} />
           <span className={`badge badge-${wi.severity}`}>{wi.severity}</span>
         </div>
@@ -156,7 +156,6 @@ const s = {
   table: { width: '100%', borderCollapse: 'collapse' },
   thead: { background: 'var(--surface2)' },
   th: { padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border)' },
-  tr: { borderBottom: '1px solid var(--border)', transition: 'background 0.1s' },
   td: { padding: '12px 16px', verticalAlign: 'middle' },
   rowTitle: { fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 2 },
   rowId: { fontSize: 11, color: 'var(--text3)', fontFamily: 'monospace' },

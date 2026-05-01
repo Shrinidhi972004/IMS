@@ -15,7 +15,7 @@ import (
 const (
 	dashboardKey      = "ims:dashboard:state"
 	debounceKeyPrefix = "ims:debounce:"
-	dashboardTTL      = 30 * time.Second
+	dashboardTTL      = 3 * time.Second
 	debounceTTL       = 15 * time.Second // slightly longer than 10s window
 )
 
