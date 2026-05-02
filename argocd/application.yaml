@@ -18,7 +18,7 @@ spec:
   # Source — Helm chart from Git repo
   source:
     repoURL: https://github.com/Shrinidhi972004/ims.git
-    targetRevision: main
+    targetRevision: feat/bonus-enhancements
     path: helm/ims
     helm:
       releaseName: ims
