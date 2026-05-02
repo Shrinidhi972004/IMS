@@ -130,7 +130,6 @@ export default function IncidentsPage({ onWsConnect }) {
             {!loading && filtered.length === 0 && (
               <tr>
                 <td colSpan={6} style={s.emptyCell}>
-                  <div style={s.emptyIcon}>🎉</div>
                   <div style={s.emptyTitle}>No incidents found</div>
                   <div style={s.emptyDesc}>
                     {filter === 'All' ? 'Your infrastructure is healthy.' : `No ${filter.toLowerCase()} incidents.`}

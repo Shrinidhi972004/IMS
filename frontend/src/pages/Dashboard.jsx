@@ -87,7 +87,7 @@ export default function Dashboard({ onWsConnect }) {
               )}
               {!loading && active.length === 0 && (
                 <tr><td colSpan={6} style={{ padding: 48, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
-                  No active incidents 🎉
+                  No active incidents 
                 </td></tr>
               )}
               {active.map((wi, i) => (
