@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
+import Sidebar from './components/Sidebar'
+import Dashboard from './pages/Dashboard'
+import IncidentsPage from './pages/IncidentsPage'
 import IncidentDetail from './pages/IncidentDetail'
 import RCAForm from './pages/RCAForm'
-import LiveFeed from './components/LiveFeed'
-import TopBar from './components/TopBar'
 import './index.css'
 
 function isAuthenticated() {
@@ -14,44 +15,26 @@ function isAuthenticated() {
 export default function App() {
   const [authed, setAuthed] = useState(isAuthenticated)
   const [wsConnected, setWsConnected] = useState(false)
-
   const handleLogin = () => setAuthed(true)
-  const handleLogout = () => { setAuthed(false) }
+  const handleLogout = () => setAuthed(false)
   const handleWsConnect = useCallback(() => setWsConnected(true), [])
 
-  if (!authed) {
-    return <LoginPage onLogin={handleLogin} />
-  }
+  if (!authed) return <LoginPage onLogin={handleLogin} />
 
   return (
     <BrowserRouter>
-      <div style={styles.layout}>
-        <TopBar onLogout={handleLogout} wsConnected={wsConnected} />
-        <div style={styles.body}>
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
+        <Sidebar onLogout={handleLogout} wsConnected={wsConnected} />
+        <main style={{ flex: 1, overflowY: 'auto' }}>
           <Routes>
-            <Route
-              path="/"
-              element={<LiveFeed onWsConnect={handleWsConnect} />}
-            />
+            <Route path="/" element={<Dashboard onWsConnect={handleWsConnect} />} />
+            <Route path="/incidents" element={<IncidentsPage onWsConnect={handleWsConnect} />} />
             <Route path="/incident/:id" element={<IncidentDetail />} />
             <Route path="/incident/:id/rca" element={<RCAForm />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </div>
+        </main>
       </div>
     </BrowserRouter>
   )
-}
-
-const styles = {
-  layout: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100vh',
-    overflow: 'hidden',
-  },
-  body: {
-    flex: 1,
-    overflowY: 'auto',
-  },
 }
