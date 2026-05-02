@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ims
+  namespace: argocd
+  labels:
+    app: ims
+    team: sre
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: ims-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: ims-alerts
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  project: ims
+
+  # Source — Helm chart from Git repo
+  source:
+    repoURL: https://github.com/Shrinidhi972004/ims.git
+    targetRevision: main
+    path: helm/ims
+    helm:
+      releaseName: ims
+      valueFiles:
+        - values.yaml
+      parameters:
+        - name: image.backend.repository
+          value: ghcr.io/shrinidhi972004/ims-backend
+        - name: image.frontend.repository
+          value: ghcr.io/shrinidhi972004/ims-frontend
+        - name: image.backend.tag
+          value: latest
+        - name: image.frontend.tag
+          value: latest
+        - name: replicaCount
+          value: "2"
+
+  # Destination — deploy to ims namespace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ims
+
+  # Sync policy — fully automated GitOps
+  syncPolicy:
+    automated:
+      prune: true        # remove resources not in Git
+      selfHeal: true     # auto-fix drift from desired state
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health check overrides
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # ignore HPA-managed replica count
+
+  # Revive degraded apps after this duration
+  revisionHistoryLimit: 10
