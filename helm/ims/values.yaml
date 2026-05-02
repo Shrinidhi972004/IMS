@@ -9,11 +9,11 @@ image:
   backend:
     repository: ghcr.io/shrinidhi972004/ims-backend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   frontend:
     repository: ghcr.io/shrinidhi972004/ims-frontend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
 # JWT secret — override in production
 jwt:
