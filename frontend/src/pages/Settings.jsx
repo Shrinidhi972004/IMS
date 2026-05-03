@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import api from '../lib/api'
+import { useWebSocket } from '../hooks/useWebSocket'
 
 export default function Settings() {
   const [health, setHealth] = useState(null)
@@ -7,13 +8,11 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
-      // Use /api/v1/dashboard which works through nginx
       const dash = await api.getDashboard()
       setDashboard(dash)
 
-      // Try /health directly
       const res = await fetch('/health')
       if (res.ok) {
         const data = await res.json()
@@ -25,13 +24,19 @@ export default function Settings() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  const handleWsMessage = useCallback(() => {
+    fetchData()
+  }, [fetchData])
+
+  useWebSocket(handleWsMessage)
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 10000)
+    const interval = setInterval(fetchData, 3000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchData])
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
@@ -43,7 +48,6 @@ export default function Settings() {
 
   return (
     <div style={s.root}>
-      {/* Header */}
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.title}>System Settings</h1>
@@ -103,9 +107,7 @@ export default function Settings() {
                   </div>
                 </div>
               ))
-              : (
-                // Fallback using dashboard data
-                [
+              : [
                   { name: 'postgres', label: 'POSTGRESQL', desc: 'Source of truth — WorkItems + RCA', icon: '🐘' },
                   { name: 'mongodb', label: 'MONGODB', desc: 'Raw signal audit log', icon: '🍃' },
                   { name: 'redis', label: 'REDIS', desc: 'Dashboard cache + debounce tracking', icon: '⚡' },
@@ -123,7 +125,6 @@ export default function Settings() {
                     </div>
                   </div>
                 ))
-              )
             }
           </div>
         </div>
@@ -155,11 +156,7 @@ export default function Settings() {
                   </div>
                 </div>
                 <StatRow label="Total Enqueued" value={health.queue.enqueued?.toLocaleString()} />
-                <StatRow
-                  label="Total Dropped"
-                  value={health.queue.dropped}
-                  color={health.queue.dropped > 0 ? '#dc2626' : '#16a34a'}
-                />
+                <StatRow label="Total Dropped" value={health.queue.dropped} color={health.queue.dropped > 0 ? '#dc2626' : '#16a34a'} />
               </>
             ) : (
               <>
