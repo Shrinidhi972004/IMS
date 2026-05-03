@@ -75,7 +75,6 @@ export default function Settings() {
 
       <div style={s.grid}>
 
-        {/* Dependencies */}
         <div style={s.card}>
           <div style={s.cardHeader}>
             <span style={s.cardTitle}>🔌 Data Store Connections</span>
@@ -129,7 +128,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Signal Queue */}
         <div style={s.card}>
           <div style={s.cardHeader}>
             <span style={s.cardTitle}>📊 Signal Queue</span>
@@ -177,7 +175,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Worker Pool */}
         <div style={s.card}>
           <div style={s.cardHeader}>
             <span style={s.cardTitle}>⚙️ Worker Pool</span>
@@ -203,7 +200,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Runtime & Memory */}
         <div style={s.card}>
           <div style={s.cardHeader}>
             <span style={s.cardTitle}>🧠 Runtime & Memory</span>
@@ -230,7 +226,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Tech Stack */}
         <div style={{ ...s.card, gridColumn: '1 / -1' }}>
           <div style={s.cardHeader}>
             <span style={s.cardTitle}>🛠️ Tech Stack</span>
