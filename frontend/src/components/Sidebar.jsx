@@ -8,6 +8,9 @@ const NAV = [
   { section: 'OPERATIONS', items: [
     { label: 'Incidents', path: '/incidents', icon: '⚠' },
   ]},
+  { section: 'ORGANIZATION', items: [
+    { label: 'Settings', path: '/settings', icon: '⚙' },
+  ]},
 ]
 
 export default function Sidebar({ onLogout, wsConnected }) {
