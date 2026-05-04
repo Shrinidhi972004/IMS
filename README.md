@@ -5,6 +5,13 @@
 
 ---
 
+## Quick Navigation
+
+- [Deployment 1 — Docker Compose (Local)](#deployment-1--docker-compose-local)
+- [Deployment 2 — Production on AWS EKS (DevOps/SRE/GitOps)](#deployment-2--production-on-aws-eks-devopssregitops)
+
+---
+
 ## Overview
 
 IMS is a production-grade **Incident Management System** designed to monitor a complex distributed stack — APIs, MCP Hosts, Distributed Caches, Async Queues, RDBMS, and NoSQL stores — and manage failure mediation workflows end to end.
@@ -286,10 +293,10 @@ The script simulates:
 
 ---
 
-#### 13. Settings Dashboard
-> Showing all the techstacks and metrics
+#### 14. Settings Dashboard
+> Real-time system health — all stores connected, 20 workers active, goroutine count
 
-![Settings dashboard](docs/screenshots/13-settings-dashboard1.png)
+![Settings Dashboard](docs/screenshots/14-settings-dashboard.png)
 
 ---
 
@@ -375,16 +382,327 @@ ims/
 
 ---
 
-## Bonus — DevOps / SRE / GitOps
+## Deployment 2 — Production on AWS EKS (DevOps/SRE/GitOps)
 
-> See [`feat/bonus-enhancements`](https://github.com/Shrinidhi972004/ims/tree/feat/bonus-enhancements) branch for full bonus implementation.
+This deployment demonstrates production-grade SRE practices — infrastructure as code, GitOps, observability, and alerting — all running on AWS EKS with fully managed AWS services.
 
-- **Helm Chart** — production-grade Kubernetes deployment with HPA, PDB, pod anti-affinity, security contexts, init containers
-- **ArgoCD** — full GitOps pipeline with automated sync, self-heal, and prune from GitHub
-- **GitHub Actions CI/CD** — `go test -race`, Docker build + push to GHCR on every push
-- **kube-prometheus-stack** — Prometheus + Grafana + Alertmanager deployed via Helm
-- **Slack Alerting** — P0/P1/P2 alerts routed to dedicated Slack channels via Alertmanager
-- **Terraform** — modular AWS infrastructure (VPC, EKS, ECR, RDS PostgreSQL, ElastiCache Redis, DocumentDB)
-- **System Settings page** — real-time health dashboard with queue stats, worker pool, memory usage, goroutine count
-- **SLO definitions** — `docs/slo.md` with error budgets and MTTR targets
-- **Incident runbook** — `docs/runbook.md` with P0/P1/P2 response procedures
+### Infrastructure Overview
+
+```
+AWS (ap-south-1)
+├── VPC — 3 AZs, public + private subnets, NAT gateways
+├── EKS — 3x t3.medium nodes (Kubernetes v1.31)
+├── ECR — ims-backend + ims-frontend image repositories
+├── RDS PostgreSQL 14 — managed, encrypted, private subnet
+├── ElastiCache Redis 7 — managed, private subnet
+└── DocumentDB — managed MongoDB-compatible, private subnet
+```
+
+### Prerequisites
+
+- AWS CLI configured
+- Terraform >= 1.5.0
+- kubectl
+- Helm 3.x
+- Docker
+
+---
+
+### Step 1 — Provision AWS Infrastructure (Terraform)
+
+```bash
+cd terraform
+
+# Initialize backend (S3 + DynamoDB)
+terraform init
+
+# Preview
+terraform plan -var-file=environments/dev.tfvars
+
+# Apply — takes ~20 minutes
+terraform apply -var-file=environments/dev.tfvars -auto-approve
+```
+
+Terraform provisions:
+- VPC with public/private subnets across 3 AZs
+- EKS cluster (v1.31) with managed node group
+- ECR repositories for backend and frontend
+- RDS PostgreSQL (db.t3.micro)
+- ElastiCache Redis (cache.t3.micro)
+- DocumentDB (db.t3.medium)
+- IAM roles for EKS cluster and nodes
+
+---
+
+### Step 2 — Configure kubectl
+
+```bash
+aws eks update-kubeconfig --region ap-south-1 --name ims-dev
+kubectl get nodes
+```
+
+---
+
+### Step 3 — Build and Push Images to ECR
+
+```bash
+# Login to ECR
+aws ecr get-login-password --region ap-south-1 | \
+  docker login --username AWS --password-stdin \
+  009882533113.dkr.ecr.ap-south-1.amazonaws.com
+
+# Backend
+docker build -t ims-backend ./backend
+docker tag ims-backend:latest \
+  009882533113.dkr.ecr.ap-south-1.amazonaws.com/ims-backend:latest
+docker push \
+  009882533113.dkr.ecr.ap-south-1.amazonaws.com/ims-backend:latest
+
+# Frontend
+docker build -t ims-frontend ./frontend
+docker tag ims-frontend:latest \
+  009882533113.dkr.ecr.ap-south-1.amazonaws.com/ims-frontend:latest
+docker push \
+  009882533113.dkr.ecr.ap-south-1.amazonaws.com/ims-frontend:latest
+```
+
+---
+
+### Step 4 — Deploy IMS via Helm
+
+```bash
+kubectl create namespace ims
+
+helm install ims ./helm/ims \
+  --namespace ims \
+  --set postgres.enabled=false \
+  --set mongodb.enabled=false \
+  --set redis.enabled=false \
+  --set image.backend.repository=<ECR_BACKEND_URL> \
+  --set image.backend.tag=latest \
+  --set image.backend.pullPolicy=Always \
+  --set image.frontend.repository=<ECR_FRONTEND_URL> \
+  --set image.frontend.tag=latest \
+  --set image.frontend.pullPolicy=Always \
+  --set postgres.host=<RDS_ENDPOINT> \
+  --set postgres.username=imsadmin \
+  --set "postgres.password=<PASSWORD>" \
+  --set "mongo.uri=mongodb://<DOCDB_ENDPOINT>:27017/?replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false" \
+  --set redis.addr=<REDIS_ENDPOINT>
+
+# Expose frontend via AWS Load Balancer
+kubectl expose service ims-frontend \
+  --type=LoadBalancer --name=ims-frontend-lb \
+  --port=80 --target-port=80 -n ims
+
+kubectl get svc ims-frontend-lb -n ims
+```
+
+The Helm chart includes:
+- **HPA** — backend scales 2→10 replicas at 70% CPU
+- **PodDisruptionBudget** — minimum 1 replica during node drains
+- **Pod Anti-Affinity** — backend pods spread across nodes
+- **Security Contexts** — non-root, readOnlyRootFilesystem, drop ALL capabilities
+- **Rolling Updates** — zero downtime (maxUnavailable: 0)
+- **Prometheus Annotations** — auto-scrape on /metrics
+
+---
+
+### Step 5 — Install ArgoCD (GitOps)
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f \
+  https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+kubectl wait --for=condition=available --timeout=300s \
+  deployment/argocd-server -n argocd
+
+# Get admin password
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+
+# Apply IMS GitOps manifests
+kubectl apply -f argocd/project.yaml
+kubectl apply -f argocd/application.yaml
+
+# Expose ArgoCD UI
+kubectl patch svc argocd-server -n argocd \
+  -p '{"spec": {"type": "LoadBalancer"}}'
+```
+
+ArgoCD syncs automatically from `feat/bonus-enhancements` with:
+- Auto-sync on every Git push
+- Self-heal to revert manual drift
+- Prune to remove deleted resources
+- Retry with exponential backoff (5 attempts)
+
+---
+
+### Step 6 — Install Monitoring Stack (Helm)
+
+```bash
+helm repo add prometheus-community \
+  https://prometheus-community.github.io/helm-charts
+helm repo update
+
+kubectl create namespace monitoring
+
+helm install kube-prometheus-stack \
+  prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --set grafana.adminPassword=admin \
+  -f helm/monitoring/values.yaml
+
+# Expose Grafana and Prometheus via LoadBalancer
+kubectl patch svc kube-prometheus-stack-grafana -n monitoring \
+  -p '{"spec": {"type": "LoadBalancer"}}'
+
+kubectl patch svc kube-prometheus-stack-prometheus -n monitoring \
+  -p '{"spec": {"type": "LoadBalancer"}}'
+```
+
+---
+
+### Step 7 — Teardown
+
+```bash
+cd terraform
+terraform destroy -var-file=environments/dev.tfvars -auto-approve
+```
+
+---
+
+### Custom Prometheus Metrics
+
+IMS exposes 7 custom metrics at `/metrics`:
+
+| Metric | Type | Description |
+|---|---|---|
+| `ims_signals_per_second` | Gauge | Current signal ingestion rate |
+| `ims_signals_ingested_total` | Counter | Total signals received |
+| `ims_signals_dropped_total` | Counter | Signals dropped due to backpressure |
+| `ims_queue_fill_ratio` | Gauge | Signal queue fill percentage (0.0 to 1.0) |
+| `ims_active_incidents` | Gauge | Number of OPEN + INVESTIGATING incidents |
+| `ims_work_items_by_state` | Gauge | WorkItems grouped by state label |
+| `ims_websocket_clients` | Gauge | Connected WebSocket clients |
+
+**Key PromQL queries used in Grafana dashboards:**
+
+```promql
+# Live signals per second
+ims_signals_per_second
+
+# Signal ingestion rate (1m window)
+rate(ims_signals_ingested_total[1m])
+
+# Queue pressure %
+ims_queue_fill_ratio * 100
+
+# Active incidents
+ims_active_incidents
+
+# Work items by state
+ims_work_items_by_state
+
+# Node CPU usage %
+100 - (avg by(node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+# Node memory usage %
+100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+
+# Pod restarts in IMS namespace
+increase(kube_pod_container_status_restarts_total{namespace="ims"}[1h])
+
+# IMS CPU usage
+sum(rate(container_cpu_usage_seconds_total{namespace="ims"}[5m]))
+```
+
+---
+
+### Alert Rules
+
+| Alert | Condition | Severity | Slack Channel |
+|---|---|---|---|
+| IMSBackendDown | backend unreachable for 1m | critical | #incidents-critical |
+| IMSHighSignalDropRate | signals dropped > 0 for 30s | critical | #incidents-critical |
+| IMSQueuePressureHigh | queue fill > 80% for 1m | warning | #sre-alerts |
+| IMSActiveIncidentsHigh | active incidents > 5 for 2m | warning | #sre-alerts |
+| IMSHighHTTPLatency | p95 latency > 1s for 2m | warning | #sre-alerts |
+
+---
+
+### EKS Deployment Screenshots
+
+#### 15. All Pods Running — ims + monitoring + argocd namespaces
+> `kubectl get pods -n ims`, `kubectl get pods -n monitoring`, `kubectl get pods -n argocd`
+
+![EKS All Pods](docs/screenshots/15-eks-pods-all-namespaces.png)
+
+---
+
+#### 16. Services + ArgoCD Status + Terraform Output
+> LoadBalancer URLs, ArgoCD sync status, Terraform infrastructure outputs
+
+![Services ArgoCD Terraform](docs/screenshots/16-eks-svc-argocd-terraform.png)
+
+---
+
+#### 17. IMS Frontend Running on AWS Load Balancer
+> IMS dashboard accessible via real AWS LB URL — incidents visible
+
+![IMS on EKS LB](docs/screenshots/17-ims-frontend-eks-lb.png)
+
+---
+
+#### 18. ArgoCD Applications Page
+> IMS application — Healthy + Synced to `feat/bonus-enhancements` branch
+
+![ArgoCD Applications](docs/screenshots/18-argocd-applications.png)
+
+---
+
+#### 19. ArgoCD Resource Tree
+> Full Kubernetes resource tree — all Deployments, Services, Pods green
+
+![ArgoCD Resource Tree](docs/screenshots/19-argocd-resource-tree.png)
+
+---
+
+#### 20. Grafana — IMS Application Metrics Dashboard
+> Custom dashboard — signals/sec, active incidents, queue fill ratio, work items by state
+
+![Grafana IMS Dashboard](docs/screenshots/20-grafana-ims-dashboard.png)
+
+---
+
+#### 21. Grafana — Node / Cluster Metrics Dashboard
+> Node CPU, memory, disk, network I/O across all 3 EKS nodes
+
+![Grafana Node Dashboard](docs/screenshots/21-grafana-node-dashboard.png)
+
+---
+
+#### 22. Slack Alert Notifications
+> P0 and warning alerts routed to #incidents-critical and #sre-alerts via Alertmanager
+
+![Slack Alerts](docs/screenshots/22-slack-alerts.png)
+
+---
+
+### GitOps Flow
+
+```
+Developer pushes to feat/bonus-enhancements
+              ↓
+GitHub Actions CI
+  - go test -race ./...
+  - docker build + push to GHCR
+              ↓
+ArgoCD detects changes (polls every 3 min)
+  - Syncs Helm chart to EKS cluster
+  - Self-heals any manual configuration drift
+  - Prunes resources deleted from Git
+              ↓
+IMS running on AWS EKS ✅
+```
