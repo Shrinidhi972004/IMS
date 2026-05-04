@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import IncidentsPage from './pages/IncidentsPage'
 import IncidentDetail from './pages/IncidentDetail'
 import RCAForm from './pages/RCAForm'
+import Settings from './pages/Settings'
 import './index.css'
 
 function isAuthenticated() {
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/incidents" element={<IncidentsPage onWsConnect={handleWsConnect} />} />
             <Route path="/incident/:id" element={<IncidentDetail />} />
             <Route path="/incident/:id/rca" element={<RCAForm />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

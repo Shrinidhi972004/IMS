@@ -2,18 +2,17 @@
 # IMS Helm Chart — Default Values
 # Override with: helm install ims ./helm/ims -f my-values.yaml
 # ============================================================
-
 replicaCount: 2
 
 image:
   backend:
-    repository: ghcr.io/shrinidhi972004/ims-backend
+    repository: 009882533113.dkr.ecr.ap-south-1.amazonaws.com/ims-backend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   frontend:
-    repository: ghcr.io/shrinidhi972004/ims-frontend
+    repository: 009882533113.dkr.ecr.ap-south-1.amazonaws.com/ims-frontend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
 # JWT secret — override in production
 jwt:
@@ -24,6 +23,10 @@ backend:
   port: 8080
   workerCount: 20
   queueCapacity: 50000
+  env:
+    POSTGRES_DSN: ""
+    MONGO_URI: ""
+    REDIS_ADDR: ""
   resources:
     requests:
       cpu: 200m
@@ -64,22 +67,28 @@ ingress:
   host: ims.example.com
   tls: []
 
-# PostgreSQL (uses Bitnami chart in production; local config here)
+# PostgreSQL — set enabled: false when using RDS
 postgres:
-  host: postgres
+  enabled: false
+  host: ims-dev-postgres.c5uw48a4en61.ap-south-1.rds.amazonaws.com
   port: 5432
   database: ims
-  username: ims
-  password: ims
+  username: imsadmin
+  password: "ImsSecure2025!"
 
-# MongoDB
+# MongoDB — set enabled: false when using DocumentDB
 mongo:
-  uri: mongodb://mongodb:27017
+  enabled: false
+  uri: "mongodb://imsadmin:ImsSecure2025%21@ims-dev-docdb.cluster-c5uw48a4en61.ap-south-1.docdb.amazonaws.com:27017/?replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
   database: ims
 
-# Redis
+mongodb:
+  enabled: false
+
+# Redis — set enabled: false when using ElastiCache
 redis:
-  addr: redis:6379
+  enabled: false
+  addr: "ims-dev-redis.0objtq.0001.aps1.cache.amazonaws.com:6379"
   password: ""
 
 # Pod security context
@@ -96,7 +105,7 @@ securityContext:
     drop:
       - ALL
 
-# Pod Disruption Budget — ensures at least 1 replica during rolling updates
+# Pod Disruption Budget
 podDisruptionBudget:
   enabled: true
   minAvailable: 1

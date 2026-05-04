@@ -1,8 +1,6 @@
-
 # ============================================================
 # IMS — Incident Management System
 # Services: backend · frontend · postgres · mongodb · redis
-#           prometheus · grafana
 # Run: docker compose up --build
 # ============================================================
 
@@ -14,14 +12,11 @@ volumes:
   postgres-data:
   mongo-data:
   redis-data:
-  prometheus-data:
-  grafana-data:
 
 services:
 
   # ----------------------------------------------------------
   # PostgreSQL — source of truth (WorkItems + RCAs)
-  # Using TimescaleDB image for timeseries hypertable support
   # ----------------------------------------------------------
   postgres:
     image: timescale/timescaledb:latest-pg16
@@ -96,14 +91,14 @@ services:
     container_name: ims-backend
     restart: unless-stopped
     environment:
-      PORT:          "8080"
-      LOG_PRETTY:    "false"
-      JWT_SECRET:    "change-me-in-production-use-a-long-random-string"
-      POSTGRES_DSN:  "postgres://ims:ims@postgres:5432/ims?sslmode=disable"
-      MONGO_URI:     "mongodb://mongodb:27017"
-      MONGO_DB:      "ims"
-      REDIS_ADDR:    "redis:6379"
-      REDIS_PASS:    ""
+      PORT:           "8080"
+      LOG_PRETTY:     "false"
+      JWT_SECRET:     "change-me-in-production-use-a-long-random-string"
+      POSTGRES_DSN:   "postgres://ims:ims@postgres:5432/ims?sslmode=disable"
+      MONGO_URI:      "mongodb://mongodb:27017"
+      MONGO_DB:       "ims"
+      REDIS_ADDR:     "redis:6379"
+      REDIS_PASS:     ""
       QUEUE_CAPACITY: "50000"
       WORKER_COUNT:   "20"
     ports:
@@ -117,7 +112,6 @@ services:
         condition: service_healthy
     networks:
       - ims-net
-
 
   # ----------------------------------------------------------
   # Frontend — React / Vite → Nginx
@@ -135,48 +129,3 @@ services:
         condition: service_started
     networks:
       - ims-net
-
-  # ----------------------------------------------------------
-  # Prometheus — metrics scraper
-  # ----------------------------------------------------------
-  prometheus:
-    image: prom/prometheus:v2.51.2
-    container_name: ims-prometheus
-    restart: unless-stopped
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=7d"
-      - "--web.enable-lifecycle"
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    networks:
-      - ims-net
-    depends_on:
-      - backend
-
-  # ----------------------------------------------------------
-  # Grafana — pre-built NOC dashboard
-  # Open: http://localhost:3001  (admin / admin)
-  # ----------------------------------------------------------
-  grafana:
-    image: grafana/grafana:10.4.2
-    container_name: ims-grafana
-    restart: unless-stopped
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_USERS_ALLOW_SIGN_UP:     "false"
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/ims-dashboard.json
-    ports:
-      - "3001:3000"
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - ims-net
-    depends_on:
-      - prometheus

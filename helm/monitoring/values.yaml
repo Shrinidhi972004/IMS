@@ -1,0 +1,139 @@
+# kube-prometheus-stack custom values for IMS
+# Deploy: helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#   --namespace monitoring -f helm/monitoring/values.yaml
+
+grafana:
+  adminPassword: admin
+  defaultDashboardsEnabled: true
+
+# Alertmanager — Slack routing
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+      slack_api_url: 'YOUR_SLACK_WEBHOOK_URL'
+
+    route:
+      group_by: ['alertname', 'severity']
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 1h
+      receiver: slack-default
+      routes:
+        - match:
+            severity: critical
+          receiver: slack-critical
+        - match:
+            severity: warning
+          receiver: slack-warning
+
+    receivers:
+      - name: slack-default
+        slack_configs:
+          - channel: '#general'
+            send_resolved: true
+            title: '{{ .GroupLabels.alertname }}'
+            text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+      - name: slack-critical
+        slack_configs:
+          - channel: '#incidents-critical'
+            icon_emoji: ':red_circle:'
+            username: 'IMS Alertmanager'
+            send_resolved: true
+            title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Status:* {{ .Status }}
+              {{ end }}
+            color: '#dc2626'
+            actions:
+              - type: button
+                text: 'View IMS Dashboard'
+                url: 'http://localhost:3002'
+
+      - name: slack-warning
+        slack_configs:
+          - channel: '#sre-alerts'
+            icon_emoji: ':warning:'
+            username: 'IMS Alertmanager'
+            send_resolved: true
+            title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              {{ end }}
+            color: '#d97706'
+
+    inhibit_rules:
+      - source_match:
+          alertname: IMSBackendDown
+        target_match_re:
+          alertname: '.*'
+
+# Prometheus — scrape IMS backend
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    additionalScrapeConfigs:
+      - job_name: 'ims-backend'
+        static_configs:
+          - targets: ['ims-backend.ims.svc.cluster.local:8080']
+        metrics_path: '/metrics'
+        scrape_interval: 10s
+
+    # IMS Alert Rules
+    additionalRuleGroups:
+      - name: ims.critical
+        interval: 30s
+        rules:
+          - alert: IMSBackendDown
+            expr: up{job="ims-backend"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "IMS Backend is DOWN"
+              description: "IMS backend unreachable for 1 minute. All signal ingestion failing."
+
+          - alert: IMSHighSignalDropRate
+            expr: rate(ims_signals_dropped_total[5m]) > 0
+            for: 30s
+            labels:
+              severity: critical
+            annotations:
+              summary: "IMS dropping signals — backpressure active"
+              description: "Signals dropped at {{ $value | humanize }}/sec. Queue full — returning 429."
+
+      - name: ims.warning
+        interval: 30s
+        rules:
+          - alert: IMSQueuePressureHigh
+            expr: ims_queue_fill_ratio > 0.80
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "IMS signal queue pressure HIGH"
+              description: "Queue fill ratio {{ humanizePercentage $value }}. Scale workers."
+
+          - alert: IMSActiveIncidentsHigh
+            expr: ims_active_incidents > 5
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High active incident count"
+              description: "{{ $value }} active incidents open. Triage required."
+
+          - alert: IMSHighHTTPLatency
+            expr: histogram_quantile(0.95, rate(ims_http_request_duration_seconds_bucket[5m])) > 1.0
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "IMS API p95 latency SLO breach"
+              description: "p95 latency {{ $value | humanizeDuration }}. Target < 1s."

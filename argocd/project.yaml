@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ims
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: IMS — Incident Management System project
+
+  # Source repos allowed
+  sourceRepos:
+    - https://github.com/Shrinidhi972004/ims.git
+
+  # Destination clusters and namespaces
+  destinations:
+    - namespace: ims
+      server: https://kubernetes.default.svc
+    - namespace: ims-staging
+      server: https://kubernetes.default.svc
+
+  # Cluster resource whitelist
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: 'rbac.authorization.k8s.io'
+      kind: ClusterRole
+    - group: 'rbac.authorization.k8s.io'
+      kind: ClusterRoleBinding
+
+  # Namespace resource whitelist
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Roles
+  roles:
+    - name: admin
+      description: Full access to IMS project
+      policies:
+        - p, proj:ims:admin, applications, *, ims/*, allow
+      groups:
+        - ims-admins
+    - name: readonly
+      description: Read-only access to IMS project
+      policies:
+        - p, proj:ims:readonly, applications, get, ims/*, allow
+      groups:
+        - ims-viewers

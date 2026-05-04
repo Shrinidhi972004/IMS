@@ -2,9 +2,9 @@ name: CI — Build & Push
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, feat/bonus-enhancements]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, feat/bonus-enhancements]
 
 env:
   REGISTRY: ghcr.io
