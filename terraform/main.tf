@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "ims-terraform-state-009882533113"
-    key          = "ims/terraform.tfstate"
-    region       = "ap-south-1"
-    use_lockfile = true
-    encrypt      = true
+    bucket         = "ims-terraform-state-009882533113"
+    key            = "ims/terraform.tfstate"
+    region         = "ap-south-1"
+    encrypt        = true
+    dynamodb_table = "ims-terraform-locks"
   }
 }
 
