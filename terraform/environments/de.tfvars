@@ -1,9 +1,0 @@
-aws_region         = "ap-south-1"
-project            = "ims"
-environment        = "dev"
-vpc_cidr           = "10.0.0.0/16"
-cluster_version    = "1.29"
-node_instance_type = "t3.medium"
-node_desired_size  = 3
-node_min_size      = 1
-node_max_size      = 5
