@@ -286,6 +286,13 @@ The script simulates:
 
 ---
 
+#### 13. Settings Dashboard
+> Showing all the techstacks and metrics
+
+![Settings dashboard](docs/screenshots/13-settings-dashboard1.png)
+
+---
+
 ### Service URLs
 
 | Service | URL | Credentials |
