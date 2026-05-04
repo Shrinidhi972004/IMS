@@ -23,6 +23,10 @@ backend:
   port: 8080
   workerCount: 20
   queueCapacity: 50000
+  env:
+    POSTGRES_DSN: ""
+    MONGO_URI: ""
+    REDIS_ADDR: ""
   resources:
     requests:
       cpu: 200m

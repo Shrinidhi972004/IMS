@@ -70,13 +70,13 @@ spec:
                   name: {{ .Release.Name }}-secrets
                   key: jwt-secret
             - name: POSTGRES_DSN
-              value: "{{ if .Values.backend.env.POSTGRES_DSN }}{{ .Values.backend.env.POSTGRES_DSN }}{{ else }}postgres://{{ .Values.postgres.username }}:{{ .Values.postgres.password }}@{{ .Values.postgres.host }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}?sslmode=disable{{ end }}"
+              value: "{{ if and .Values.backend.env .Values.backend.env.POSTGRES_DSN }}{{ .Values.backend.env.POSTGRES_DSN }}{{ else }}postgres://{{ .Values.postgres.username }}:{{ .Values.postgres.password }}@{{ .Values.postgres.host }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}?sslmode=disable{{ end }}"
             - name: MONGO_URI
-              value: "{{ if .Values.backend.env.MONGO_URI }}{{ .Values.backend.env.MONGO_URI }}{{ else }}{{ .Values.mongo.uri }}{{ end }}"
+              value: "{{ if and .Values.backend.env .Values.backend.env.MONGO_URI }}{{ .Values.backend.env.MONGO_URI }}{{ else }}{{ .Values.mongo.uri }}{{ end }}"
             - name: MONGO_DB
               value: "{{ .Values.mongo.database }}"
             - name: REDIS_ADDR
-              value: "{{ if .Values.backend.env.REDIS_ADDR }}{{ .Values.backend.env.REDIS_ADDR }}{{ else }}{{ .Values.redis.addr }}{{ end }}"
+              value: "{{ if and .Values.backend.env .Values.backend.env.REDIS_ADDR }}{{ .Values.backend.env.REDIS_ADDR }}{{ else }}{{ .Values.redis.addr }}{{ end }}"
             - name: WORKER_COUNT
               value: "{{ .Values.backend.workerCount }}"
             - name: QUEUE_CAPACITY
