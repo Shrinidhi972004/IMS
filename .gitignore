@@ -24,12 +24,5 @@ Thumbs.db
 postgres-data/
 mongo-data/
 redis-data/
-# Terraform
 terraform/.terraform/
 terraform/.terraform.lock.hcl
-terraform/terraform.tfstate
-terraform/terraform.tfstate.backup
-terraform/.terraform/
-terraform/.terraform.lock.hcl
-terraform/terraform.tfstate
-terraform/terraform.tfstate.backup
