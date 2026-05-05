@@ -193,6 +193,19 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/signup \
 ./scripts/simulate_failure.sh http://localhost:8080 $TOKEN
 ```
 
+if user allready exists then use this command:
+
+```bash
+# login
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"shrinidhi","password":"sre12345"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+echo "Token: $TOKEN"
+
+# Run failure simulation
+./scripts/simulate_failure.sh http://localhost:8080 $TOKEN
+```
 The script simulates:
 - **Phase 1:** RDBMS_PRIMARY outage — 150 signals → 1 P0 WorkItem (debounce working)
 - **Phase 2:** MCP_HOST_02 cascade failure — 50 signals → 1 P1 WorkItem
@@ -579,13 +592,13 @@ IMS exposes 7 custom metrics at `/metrics`:
 
 | Metric | Type | Description |
 |---|---|---|
-| `ims_signals_per_second` | Gauge | Current signal ingestion rate |
-| `ims_signals_ingested_total` | Counter | Total signals received |
-| `ims_signals_dropped_total` | Counter | Signals dropped due to backpressure |
-| `ims_queue_fill_ratio` | Gauge | Signal queue fill percentage (0.0 to 1.0) |
-| `ims_active_incidents` | Gauge | Number of OPEN + INVESTIGATING incidents |
-| `ims_work_items_by_state` | Gauge | WorkItems grouped by state label |
-| `ims_websocket_clients` | Gauge | Connected WebSocket clients |
+| `ims_signals_per_second` | Timeseries | Current signal ingestion rate |
+| `ims_signals_ingested_total` | Timeseries | Total signals received |
+| `ims_signals_dropped_total` | Timeseries | Signals dropped due to backpressure |
+| `ims_queue_fill_ratio` | Timeseries | Signal queue fill percentage (0.0 to 1.0) |
+| `ims_active_incidents` | Timeseries | Number of OPEN + INVESTIGATING incidents |
+| `ims_work_items_by_state` | Timeseries | WorkItems grouped by state label |
+| `ims_websocket_clients` | Timeseries | Connected WebSocket clients |
 
 **Key PromQL queries used in Grafana dashboards:**
 
